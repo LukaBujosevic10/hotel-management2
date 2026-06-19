@@ -1,0 +1,4 @@
+hotel:
+  reservation:
+    max-nights: 30
+    cancellation-window-hours: 24

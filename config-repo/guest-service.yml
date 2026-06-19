@@ -1,0 +1,5 @@
+# Values here override the shared application.yml for guest-service only.
+hotel:
+  guest:
+    loyalty:
+      welcome-points: 100     # loaded from Config Server (Optional A demonstration)

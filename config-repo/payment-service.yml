@@ -1,0 +1,4 @@
+hotel:
+  payment:
+    tax-rate: 0.20            # 20% VAT applied by payment-service, loaded centrally
+    auto-create-on-reservation: true

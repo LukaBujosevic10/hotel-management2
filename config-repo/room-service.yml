@@ -1,0 +1,4 @@
+hotel:
+  room:
+    max-floor: 12
+    maintenance-buffer-hours: 4
