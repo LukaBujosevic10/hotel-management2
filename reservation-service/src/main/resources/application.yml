@@ -1,0 +1,117 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: reservation-service
+  config:
+    import: optional:configserver:${CONFIG_SERVER_URL:http://localhost:8888}
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:reservationdb}
+    driver-class-name: org.postgresql.Driver
+    username: ${DB_USER:hotel}
+    password: ${DB_PASSWORD:hotel}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+  cloud:
+    openfeign:
+      httpclient:
+        hc5:
+          enabled: true
+      # Spring Cloud 2023.x moved these from the old top-level "feign.*" prefix.
+      client:
+        config:
+          default:
+            connect-timeout: 3000
+            read-timeout: 3000
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka/}
+  instance:
+    prefer-ip-address: true
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,circuitbreakers,retries
+  health:
+    circuitbreakers:
+      enabled: true
+  tracing:
+    sampling:
+      probability: 1.0
+  zipkin:
+    tracing:
+      endpoint: ${ZIPKIN_URL:http://localhost:9411/api/v2/spans}
+
+info:
+  app:
+    name: reservation-service
+    description: Hotel Management Reservation microservice
+
+# ===================== Resilience4j configuration =====================
+resilience4j:
+  circuitbreaker:
+    instances:
+      guestService:
+        register-health-indicator: true
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50          # open circuit at 50% failures
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+        ignore-exceptions:                  # a 4xx is a valid answer, not an outage
+          - feign.FeignException$NotFound
+          - feign.FeignException$BadRequest
+      roomService:
+        register-health-indicator: true
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+        ignore-exceptions:
+          - feign.FeignException$NotFound
+          - feign.FeignException$BadRequest
+  retry:
+    instances:
+      guestService:
+        max-attempts: 3
+        wait-duration: 500ms
+        retry-exceptions:
+          - feign.FeignException
+          - java.io.IOException
+        ignore-exceptions:
+          - feign.FeignException$NotFound
+          - feign.FeignException$BadRequest
+      roomService:
+        max-attempts: 3
+        wait-duration: 500ms
+        retry-exceptions:
+          - feign.FeignException
+          - java.io.IOException
+        ignore-exceptions:
+          - feign.FeignException$NotFound
+          - feign.FeignException$BadRequest
+
