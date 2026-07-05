@@ -1,0 +1,215 @@
+# ============================================================
+#  Hotel Management - full stack, one command:  docker compose up --build
+#  Persistence: PostgreSQL (one container, one database per service)
+# ============================================================
+services:
+
+  # ---------- Database ----------
+  postgres:
+    image: postgres:16-alpine
+    container_name: postgres
+    environment:
+      - POSTGRES_USER=hotel
+      - POSTGRES_PASSWORD=hotel
+      - POSTGRES_DB=postgres          # default db; extra dbs created by init.sql
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      # init.sql runs only on FIRST start (empty volume) -> creates the 4 databases
+      - ./db-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hotel -d postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [hotel-net]
+
+  # ---------- Infrastructure ----------
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"       # AMQP
+      - "15672:15672"     # Management UI (guest/guest)
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+    networks: [hotel-net]
+
+  zipkin:
+    image: openzipkin/zipkin:latest
+    container_name: zipkin
+    ports:
+      - "9411:9411"
+    networks: [hotel-net]
+
+  eureka-server:
+    build: ./eureka-server
+    container_name: eureka-server
+    ports:
+      - "8761:8761"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8761/actuator/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+    networks: [hotel-net]
+
+  config-server:
+    build: ./config-server
+    container_name: config-server
+    ports:
+      - "8888:8888"
+    environment:
+      - EUREKA_URL=http://eureka-server:8761/eureka/
+      - CONFIG_REPO_LOCATION=file:/config-repo
+    volumes:
+      - ./config-repo:/config-repo:ro
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+    networks: [hotel-net]
+
+  # ---------- Microservices ----------
+  guest-service:
+    build: ./guest-service
+    restart: on-failure
+    environment:
+      - EUREKA_URL=http://eureka-server:8761/eureka/
+      - CONFIG_SERVER_URL=http://config-server:8888
+      - ZIPKIN_URL=http://zipkin:9411/api/v2/spans
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=guestdb
+      - DB_USER=hotel
+      - DB_PASSWORD=hotel
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    networks: [hotel-net]
+
+  room-service:
+    build: ./room-service
+    restart: on-failure
+    environment:
+      - EUREKA_URL=http://eureka-server:8761/eureka/
+      - CONFIG_SERVER_URL=http://config-server:8888
+      - ZIPKIN_URL=http://zipkin:9411/api/v2/spans
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=roomdb
+      - DB_USER=hotel
+      - DB_PASSWORD=hotel
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    networks: [hotel-net]
+
+  reservation-service:
+    build: ./reservation-service
+    restart: on-failure
+    environment:
+      - EUREKA_URL=http://eureka-server:8761/eureka/
+      - CONFIG_SERVER_URL=http://config-server:8888
+      - ZIPKIN_URL=http://zipkin:9411/api/v2/spans
+      - RABBITMQ_HOST=rabbitmq
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=reservationdb
+      - DB_USER=hotel
+      - DB_PASSWORD=hotel
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    networks: [hotel-net]
+
+  payment-service:
+    build: ./payment-service
+    restart: on-failure
+    environment:
+      - EUREKA_URL=http://eureka-server:8761/eureka/
+      - CONFIG_SERVER_URL=http://config-server:8888
+      - ZIPKIN_URL=http://zipkin:9411/api/v2/spans
+      - RABBITMQ_HOST=rabbitmq
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=paymentdb
+      - DB_USER=hotel
+      - DB_PASSWORD=hotel
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    networks: [hotel-net]
+
+  api-gateway:
+    build: ./api-gateway
+    container_name: api-gateway
+    restart: on-failure
+    ports:
+      - "8080:8080"
+    environment:
+      - EUREKA_URL=http://eureka-server:8761/eureka/
+      - CONFIG_SERVER_URL=http://config-server:8888
+      - ZIPKIN_URL=http://zipkin:9411/api/v2/spans
+      - JWT_SECRET=change-me-super-secret-hotel-jwt-signing-key-256bits!!
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+    networks: [hotel-net]
+
+  auth-service:
+    build:
+      context: ./auth-service
+    container_name: auth-service
+    restart: on-failure
+    ports:
+      - "8085:8085"
+    environment:
+      - EUREKA_URL=http://eureka-server:8761/eureka/
+      - CONFIG_SERVER_URL=http://config-server:8888
+      - ZIPKIN_URL=http://zipkin:9411/api/v2/spans
+      - JWT_SECRET=change-me-super-secret-hotel-jwt-signing-key-256bits!!
+    depends_on:
+      - eureka-server
+      - config-server
+    networks: [hotel-net]
+
+  frontend:
+    build: ./frontend
+    container_name: hotel-frontend
+    restart: on-failure
+    # Angular dev server podrazumevano radi na 4200 unutar kontejnera
+    ports:
+      - "4200:4200"
+    volumes:
+      # Mapira tvoj lokalni kod u /app unutar kontejnera (omogućava live reload)
+      - ./frontend:/app
+      # Štiti kontejnerski node_modules da ga ne pregazi tvoj lokalni (Windows/Mac)
+      - /app/node_modules
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+    depends_on:
+      - api-gateway
+    networks: [ hotel-net ]
+
+volumes:
+  postgres-data:
+
+networks:
+  hotel-net:
+    driver: bridge
