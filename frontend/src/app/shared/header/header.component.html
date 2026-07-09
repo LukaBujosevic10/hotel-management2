@@ -1,0 +1,19 @@
+<mat-toolbar color="primary" class="app-header">
+  <mat-icon class="brand-icon">hotel</mat-icon>
+  <span class="brand">{{ brand }}</span>
+
+  <span class="spacer"></span>
+
+  <span class="identity" *ngIf="username">
+    <mat-icon class="identity-icon">account_circle</mat-icon>
+    <span class="identity-text">
+      <span class="identity-name">{{ username }}</span>
+      <span class="identity-role" *ngIf="role">{{ role }}</span>
+    </span>
+  </span>
+
+  <button mat-button *ngIf="showLogout" (click)="logout.emit()" aria-label="Sign out">
+    <mat-icon>logout</mat-icon>
+    <span class="label">Logout</span>
+  </button>
+</mat-toolbar>

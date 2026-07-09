@@ -1,0 +1,25 @@
+<div class="login-wrap">
+    <mat-card class="login-card">
+        <div class="brand">
+            <mat-icon>hotel</mat-icon>
+            <h2>Hotel Lepenica</h2>
+            <p>Management Console</p>
+        </div>
+
+        <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Username</mat-label>
+            <input matInput [(ngModel)]="username" (keyup.enter)="doLogin()">
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Password</mat-label>
+            <input matInput type="password" [(ngModel)]="password" (keyup.enter)="doLogin()">
+        </mat-form-field>
+
+        <button mat-raised-button color="primary" class="full-width" (click)="doLogin()" [disabled]="loading">
+            {{ loading ? 'Signing in...' : 'Sign in' }}
+        </button>
+
+        <p class="hint">Demo: <b>manager / manager123</b> or <b>receptionist / recept123</b></p>
+    </mat-card>
+</div>

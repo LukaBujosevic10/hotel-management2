@@ -1,0 +1,14 @@
+<div class="page-header">
+  <mat-icon *ngIf="icon" class="page-icon">{{ icon }}</mat-icon>
+
+  <div class="titles">
+    <h1>{{ title }}</h1>
+    <p *ngIf="subtitle" class="subtitle"></p>
+  </div>
+
+  <span class="spacer"></span>
+
+  <div class="actions">
+    <ng-content></ng-content>
+  </div>
+</div>
