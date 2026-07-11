@@ -1,0 +1,82 @@
+
+.page {
+  display: flex;
+  flex-direction: column;
+  /* NAPOMENA: Ako imaš glavni navigacioni meni na vrhu sajta, zameni 100vh sa npr. calc(100vh - 64px) */
+  height: calc(100vh - 100px);
+  overflow: hidden;
+  box-sizing: border-box;
+}
+.table-card {
+  display: flex;
+  flex-direction: column;
+  flex: 1; /* Zauzima sav preostali prostor na ekranu */
+  padding: 0; /* Uklonjen padding da bi skrol bio tačno uz ivicu kartice */
+  margin-bottom: 16px; /* Ostavlja malo prostora do samog dna ekrana */
+  min-height: 0; /* Sprečava flexbox da raste van ekrana */
+  position: relative; /* KLJUČNO: Drži apsolutni kontejner čvrsto unutar svojih granica */
+}
+
+/* OVO JE KLJUČNO: Kontejner same tabele dobija skrolbar */
+.table-container {
+  position: absolute; /* Ignoriše visinu redova i zakucava se za ivice table-card kartice */
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow: auto; /* Omogućava vertikalni (i horizontalni po potrebi) skrol OVDJE */
+}
+
+
+
+
+.inline-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 12px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: #fdecea;
+  color: #b3261e;
+  font-size: 13px;
+}
+
+.loyalty {
+  padding: 2px 10px;
+  border-radius: 12px;
+  background: #eef2ff;
+  color: #3f51b5;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.empty {
+  padding: 24px 16px;
+  text-align: center;
+  color: #9ca3af;
+}
+
+.filter-card { padding: 8px 16px 0; margin-bottom: 16px; }
+
+.filters {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.filters .search { flex: 1 1 300px; }
+.filters .narrow { flex: 0 0 190px; }
+.filters .spacer { flex: 1 1 auto; }
+
+.count {
+  font-size: 12px;
+  color: #9ca3af;
+  white-space: nowrap;
+  padding-bottom: 18px;
+}
+
+@media (max-width: 700px) {
+  .count { display: none; }
+}

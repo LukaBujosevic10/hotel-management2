@@ -1,0 +1,20 @@
+.dialog-form {
+  display: flex;
+  flex-direction: column;
+  min-width: 360px;
+  padding-top: 8px;
+}
+
+.field { display: flex; flex-direction: column; }
+.field mat-form-field { width: 100%; }
+
+/* See room-dialog: <mat-error> never fires for validator-less ngModel controls. */
+.field-error {
+  margin: -14px 0 10px 2px;
+  font-size: 12px;
+  color: #b3261e;
+}
+
+@media (max-width: 480px) {
+  .dialog-form { min-width: auto; }
+}

@@ -1,0 +1,54 @@
+<h2 mat-dialog-title>{{ editing ? 'Edit guest' : 'New guest' }}</h2>
+
+<mat-dialog-content class="dialog-form">
+
+  <div class="field">
+    <mat-form-field appearance="outline">
+      <mat-label>First name</mat-label>
+      <input matInput [(ngModel)]="guest.firstName" name="firstName">
+    </mat-form-field>
+    <p class="field-error" *ngIf="submitted && errors['firstName']">{{ errors['firstName'] }}</p>
+  </div>
+
+  <div class="field">
+    <mat-form-field appearance="outline">
+      <mat-label>Last name</mat-label>
+      <input matInput [(ngModel)]="guest.lastName" name="lastName">
+    </mat-form-field>
+    <p class="field-error" *ngIf="submitted && errors['lastName']">{{ errors['lastName'] }}</p>
+  </div>
+
+  <div class="field">
+    <mat-form-field appearance="outline">
+      <mat-label>E-mail</mat-label>
+      <input matInput type="email" [(ngModel)]="guest.email" name="email"
+             placeholder="name@example.com">
+    </mat-form-field>
+    <p class="field-error" *ngIf="submitted && errors['email']">{{ errors['email'] }}</p>
+  </div>
+
+  <div class="field">
+    <mat-form-field appearance="outline">
+      <mat-label>Phone</mat-label>
+      <input matInput [(ngModel)]="guest.phone" name="phone" placeholder="+381 64 111 2223">
+      <mat-hint>Optional</mat-hint>
+    </mat-form-field>
+    <p class="field-error" *ngIf="submitted && errors['phone']">{{ errors['phone'] }}</p>
+  </div>
+
+  <div class="field">
+    <mat-form-field appearance="outline">
+      <mat-label>Document ID</mat-label>
+      <input matInput [(ngModel)]="guest.documentId" name="documentId"
+             placeholder="Passport or ID number">
+      <mat-hint>Must be unique per guest</mat-hint>
+    </mat-form-field>
+    <p class="field-error" *ngIf="submitted && errors['documentId']">{{ errors['documentId'] }}</p>
+  </div>
+
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button (click)="ref.close()">Cancel</button>
+  <button mat-raised-button color="primary" (click)="save()">{{ editing ? 'Save changes' : 'Create' }}</button>
+</mat-dialog-actions>
