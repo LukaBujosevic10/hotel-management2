@@ -1,0 +1,46 @@
+<h2 mat-dialog-title>Reservation #{{ d.reservation.id }}</h2>
+
+<mat-dialog-content class="details">
+  <dl>
+    <dt>Guest</dt>
+    <dd *ngIf="d.guest; else guestMissing">
+      {{ d.guest.firstName }} {{ d.guest.lastName }}
+      <span class="muted">{{ d.guest.email }}</span>
+    </dd>
+    <ng-template #guestMissing>
+      <dd class="muted">Guest details are unavailable right now.</dd>
+    </ng-template>
+
+    <dt>Room</dt>
+    <dd *ngIf="d.room; else roomMissing">
+      #{{ d.room.roomNumber }} &middot; {{ d.room.type }}
+      <span class="muted">&euro;{{ d.room.pricePerNight }} / night</span>
+    </dd>
+    <ng-template #roomMissing>
+      <dd class="muted">Room details are unavailable right now.</dd>
+    </ng-template>
+
+    <dt>Dates</dt>
+    <dd>{{ d.reservation.checkInDate }} &rarr; {{ d.reservation.checkOutDate }}
+      <span class="muted">{{ d.nights }} night(s)</span>
+    </dd>
+
+    <dt>Guests</dt>
+    <dd>{{ d.reservation.numberOfGuests }}</dd>
+
+    <dt>Total</dt>
+    <dd class="total">&euro;{{ d.reservation.totalPrice }}</dd>
+
+    <dt>Status</dt>
+    <dd><span class="status-chip status-{{ d.reservation.status }}">{{ d.reservation.status }}</span></dd>
+  </dl>
+
+  <p class="source">
+    <mat-icon inline>hub</mat-icon>
+    Aggregated from reservation, guest and room services via Feign.
+  </p>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button mat-dialog-close>Close</button>
+</mat-dialog-actions>

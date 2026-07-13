@@ -1,0 +1,144 @@
+<h2 mat-dialog-title>
+  {{ editing ? 'Edit reservation #' + data.reservation?.id : 'New reservation' }}
+  <span class="step-badge">Step {{ step }} of 2</span>
+</h2>
+
+<mat-dialog-content class="dialog-body">
+
+  <!-- ============================ STEP 1: period ============================ -->
+  <section *ngIf="step === 1" class="step">
+    <p class="step-intro" *ngIf="!editing">
+      Choose the dates first. Only rooms that are actually free for that period will be offered.
+    </p>
+    <p class="step-intro" *ngIf="editing">
+      Adjust the period, then confirm the room. The current booking does not block itself,
+      so keeping the same room is always possible.
+    </p>
+
+    <div class="date-row">
+      <mat-form-field appearance="outline">
+        <mat-label>Check-in</mat-label>
+        <input matInput [matDatepicker]="pickerIn" [min]="minCheckIn"
+               [(ngModel)]="checkIn" (dateChange)="onCheckInChange()" name="checkIn" readonly>
+        <mat-datepicker-toggle matIconSuffix [for]="pickerIn"></mat-datepicker-toggle>
+        <mat-datepicker #pickerIn></mat-datepicker>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Check-out</mat-label>
+        <input matInput [matDatepicker]="pickerOut" [min]="minCheckOut"
+               [(ngModel)]="checkOut" name="checkOut" readonly>
+        <mat-datepicker-toggle matIconSuffix [for]="pickerOut"></mat-datepicker-toggle>
+        <mat-datepicker #pickerOut></mat-datepicker>
+      </mat-form-field>
+    </div>
+
+    <mat-form-field appearance="outline" class="guests-field">
+      <mat-label>Number of guests</mat-label>
+      <input matInput type="number" min="1" max="20" [(ngModel)]="numberOfGuests" name="numberOfGuests">
+      <mat-hint>Rooms too small for this party will be filtered out</mat-hint>
+    </mat-form-field>
+
+    <p class="nights" *ngIf="nights > 0">
+      <mat-icon inline>nights_stay</mat-icon> {{ nights }} night(s)
+    </p>
+
+    <div class="form-error" *ngIf="dateError">
+      <mat-icon>error_outline</mat-icon><span>{{ dateError }}</span>
+    </div>
+  </section>
+
+  <!-- ======================= STEP 2: room and guest ======================= -->
+  <section *ngIf="step === 2" class="step">
+    <div class="period-summary">
+      <mat-icon>date_range</mat-icon>
+      <span>{{ periodLabel }}</span>
+      <button mat-button color="primary" (click)="backToDates()">Change</button>
+    </div>
+
+    <div class="no-rooms" *ngIf="!availableRooms.length">
+      <mat-icon>event_busy</mat-icon>
+      <div>
+        <strong>No rooms are free for this period.</strong>
+        <p>Try shifting the dates, shortening the stay, or reducing the number of guests.</p>
+      </div>
+    </div>
+
+    <ng-container *ngIf="availableRooms.length">
+      <h3 class="section-label">Available rooms ({{ availableRooms.length }})</h3>
+
+      <mat-radio-group class="room-list" [(ngModel)]="selectedRoomId" name="roomId">
+        <label class="room-option" *ngFor="let room of availableRooms; trackBy: trackByRoom"
+               [class.selected]="selectedRoomId === room.id">
+          <mat-radio-button [value]="room.id"></mat-radio-button>
+          <div class="room-info">
+            <span class="room-title">
+              #{{ room.roomNumber }} &middot; {{ room.type }}
+              <span class="current-badge" *ngIf="isCurrentRoom(room)">current</span>
+            </span>
+            <span class="room-meta">
+              Floor {{ room.floor }} &middot; sleeps {{ room.capacity }}
+              <ng-container *ngIf="room.description"> &middot; {{ room.description }}</ng-container>
+            </span>
+          </div>
+          <div class="room-price">
+            <span class="per-night">&euro;{{ room.pricePerNight }}<small>/night</small></span>
+            <span class="total">&euro;{{ room.pricePerNight * nights }} total</span>
+          </div>
+        </label>
+      </mat-radio-group>
+
+      <div class="guest-row">
+        <mat-form-field appearance="outline" class="guest-field">
+          <mat-label>Guest</mat-label>
+          <mat-select [(ngModel)]="guestId" name="guestId">
+            <mat-option *ngFor="let g of data.guests" [value]="g.id">
+              {{ g.firstName }} {{ g.lastName }} &mdash; {{ g.email }}
+            </mat-option>
+          </mat-select>
+          <mat-hint *ngIf="!data.guests.length">
+            No guests registered yet &mdash; use the + button to add one.
+          </mat-hint>
+        </mat-form-field>
+
+        <button mat-mini-fab color="primary" type="button"
+                class="add-guest"
+                [disabled]="addingGuest"
+                (click)="addGuest()"
+                matTooltip="Register a new guest without leaving this form"
+                aria-label="Add a new guest">
+          <mat-icon>{{ addingGuest ? 'hourglass_empty' : 'person_add' }}</mat-icon>
+        </button>
+      </div>
+
+      <div class="total-row" *ngIf="selectedRoom">
+        <span>Estimated total</span>
+        <strong>&euro;{{ estimatedTotal }}</strong>
+      </div>
+    </ng-container>
+
+    <div class="form-error" *ngIf="bookError">
+      <mat-icon>error_outline</mat-icon><span>{{ bookError }}</span>
+    </div>
+  </section>
+
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button (click)="ref.close()">Cancel</button>
+
+  <button mat-button *ngIf="step === 2" (click)="backToDates()">
+    <mat-icon>arrow_back</mat-icon> Back
+  </button>
+
+  <button mat-raised-button color="primary" *ngIf="step === 1"
+          (click)="searchRooms()" [disabled]="searching">
+    <mat-spinner *ngIf="searching" diameter="18" class="btn-spinner"></mat-spinner>
+    <span>{{ searching ? 'Searching...' : 'Find available rooms' }}</span>
+  </button>
+
+  <button mat-raised-button color="primary" *ngIf="step === 2"
+          (click)="book()" [disabled]="!availableRooms.length">
+    {{ editing ? 'Save changes' : 'Book' }}
+  </button>
+</mat-dialog-actions>

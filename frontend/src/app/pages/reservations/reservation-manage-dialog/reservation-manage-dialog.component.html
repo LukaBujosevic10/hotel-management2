@@ -1,0 +1,145 @@
+<h2 mat-dialog-title class="title">
+  <mat-icon>event_note</mat-icon>
+  Reservation #{{ data.reservationId }}
+  <span *ngIf="status" class="status-chip status-{{ status }}">{{ status }}</span>
+</h2>
+
+<mat-progress-bar *ngIf="loading || working" mode="indeterminate"></mat-progress-bar>
+
+<mat-dialog-content class="body">
+
+  <div *ngIf="error" class="banner error">
+    <mat-icon>error_outline</mat-icon><span>{{ error }}</span>
+  </div>
+
+  <div *ngIf="notice && !error" class="banner ok">
+    <mat-icon>check_circle</mat-icon><span>{{ notice }}</span>
+  </div>
+
+  <ng-container *ngIf="details as d">
+
+    <!-- ------------------------------------------------------- summary -->
+    <section class="summary">
+      <div class="summary-item">
+        <span class="k">Guest</span>
+        <span class="v">
+          <ng-container *ngIf="d.guest; else noGuest">
+            {{ d.guest.firstName }} {{ d.guest.lastName }}
+          </ng-container>
+          <ng-template #noGuest><em>unavailable</em></ng-template>
+        </span>
+        <span class="sub" *ngIf="d.guest">{{ d.guest.email }}</span>
+      </div>
+
+      <div class="summary-item">
+        <span class="k">Room</span>
+        <span class="v">
+          <ng-container *ngIf="d.room; else noRoom">#{{ d.room.roomNumber }}</ng-container>
+          <ng-template #noRoom><em>unavailable</em></ng-template>
+        </span>
+        <span class="sub" *ngIf="d.room">{{ d.room.type }} &middot; sleeps {{ d.room.capacity }}</span>
+      </div>
+
+      <div class="summary-item">
+        <span class="k">Stay</span>
+        <span class="v">{{ d.reservation.checkInDate }} &rarr; {{ d.reservation.checkOutDate }}</span>
+        <span class="sub">{{ d.nights }} night(s) &middot; {{ d.reservation.numberOfGuests }} guest(s)</span>
+      </div>
+
+      <div class="summary-item">
+        <span class="k">Total</span>
+        <span class="v money">&euro;{{ d.reservation.totalPrice }}</span>
+      </div>
+    </section>
+
+    <mat-divider></mat-divider>
+
+    <!-- -------------------------------------------------------- status -->
+    <section class="block">
+      <h3>Reservation status</h3>
+      <p class="hint" *ngIf="status === 'CANCELLED' || status === 'CHECKED_OUT'">
+        This reservation is closed, so its status can no longer be changed.
+      </p>
+
+      <div class="actions">
+        <button mat-stroked-button color="primary"
+                [disabled]="!canTransition('CHECKED_IN')"
+                (click)="setStatus('CHECKED_IN')">
+          <mat-icon>login</mat-icon> Check in
+        </button>
+        <button mat-stroked-button color="primary"
+                [disabled]="!canTransition('CHECKED_OUT')"
+                [matTooltip]="status === 'CONFIRMED' ? 'The guest must be checked in first' : ''"
+                (click)="setStatus('CHECKED_OUT')">
+          <mat-icon>logout</mat-icon> Check out
+        </button>
+        <button mat-stroked-button color="warn"
+                [disabled]="!canTransition('CANCELLED')"
+                (click)="setStatus('CANCELLED')">
+          <mat-icon>event_busy</mat-icon> Cancel
+        </button>
+      </div>
+
+      <p class="hint" *ngIf="canTransition('CANCELLED')">
+        Cancelling immediately frees these dates for a new booking.
+      </p>
+    </section>
+
+    <mat-divider></mat-divider>
+
+    <!-- ------------------------------------------------------- payment -->
+    <section class="block">
+      <h3>Payment</h3>
+
+      <div *ngIf="!payment" class="hint pending-payment">
+        <mat-icon>hourglass_empty</mat-icon>
+        No payment record yet. It is created asynchronously through RabbitMQ right
+        after booking &mdash; reopen this card in a moment.
+      </div>
+
+      <ng-container *ngIf="payment as p">
+        <div class="payment-row">
+          <div>
+            <span class="k">Amount</span>
+            <span class="v money">&euro;{{ p.amount }}</span>
+            <span class="sub">includes &euro;{{ p.taxAmount }} tax</span>
+          </div>
+          <div>
+            <span class="k">Status</span>
+            <span class="status-chip status-{{ p.status }}">{{ p.status }}</span>
+          </div>
+          <div>
+            <span class="k">Method</span>
+            <span class="v">{{ p.method || '—' }}</span>
+            <span class="sub reference" *ngIf="p.transactionRef">{{ p.transactionRef }}</span>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button mat-flat-button color="primary" [disabled]="!canPay" (click)="pay('CARD')">
+            <mat-icon>credit_card</mat-icon> Pay by card
+          </button>
+          <button mat-stroked-button [disabled]="!canPay" (click)="pay('CASH')">
+            <mat-icon>payments</mat-icon> Pay by cash
+          </button>
+          <button mat-stroked-button color="warn" [disabled]="!canRefund" (click)="refund()">
+            <mat-icon>undo</mat-icon> Refund
+          </button>
+        </div>
+      </ng-container>
+    </section>
+
+  </ng-container>
+
+  <p class="hint" *ngIf="!details && !loading && !error">
+    Nothing to show for this reservation.
+  </p>
+
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button (click)="load()" [disabled]="loading || working">
+    <mat-icon>refresh</mat-icon> Reload
+  </button>
+  <button mat-raised-button color="primary" (click)="close()">Done</button>
+</mat-dialog-actions>
