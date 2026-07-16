@@ -1,0 +1,13 @@
+<div class="page">
+
+  <app-page-header
+    icon="dashboard"
+    title="Dashboard"
+    [subtitle]="' '">
+  </app-page-header>
+
+  <app-room-timeline (reservationSelected)="openReservation($event)"></app-room-timeline>
+
+
+
+</div>

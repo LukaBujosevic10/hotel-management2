@@ -1,0 +1,116 @@
+<mat-card class="timeline-card">
+
+  <div class="timeline-toolbar">
+    <div class="nav">
+      <button mat-icon-button (click)="pan(-7)" matTooltip="Back one week" aria-label="Back one week">
+        <mat-icon>chevron_left</mat-icon>
+      </button>
+      <button mat-stroked-button (click)="goToToday()" matTooltip="Jump back to today">Today</button>
+      <button mat-icon-button (click)="pan(7)" matTooltip="Forward one week" aria-label="Forward one week">
+        <mat-icon>chevron_right</mat-icon>
+      </button>
+      <span class="range-label">{{ rangeLabel }}</span>
+    </div>
+
+    <span class="spacer"></span>
+
+    <mat-button-toggle-group [value]="dayWidth" (change)="setZoom($event.value)" aria-label="Zoom">
+      <mat-button-toggle *ngFor="let z of zoomOptions" [value]="z.width"
+                         [matTooltip]="'Day width: ' + z.width + 'px'">{{ z.label }}</mat-button-toggle>
+    </mat-button-toggle-group>
+
+    <button mat-icon-button (click)="reload()" matTooltip="Refresh" aria-label="Refresh">
+      <mat-icon>refresh</mat-icon>
+    </button>
+  </div>
+
+  <mat-progress-bar *ngIf="loading" mode="indeterminate"></mat-progress-bar>
+
+  <div *ngIf="error" class="timeline-error">
+    <mat-icon>error_outline</mat-icon>
+    <span>{{ error }}</span>
+  </div>
+
+  <div class="gantt"
+       #scroller
+       *ngIf="!error"
+       [class.dragging]="dragging"
+       (scroll)="onScroll()"
+       (pointerdown)="onPointerDown($event)"
+       (pointermove)="onPointerMove($event)"
+       (pointerup)="onPointerUp()"
+       (pointerleave)="onPointerUp()"
+       (pointercancel)="onPointerUp()">
+
+    <!-- header row: day columns -->
+    <div class="gantt-header">
+      <div class="gantt-label head">Room</div>
+      <div class="gantt-track head" [style.width.px]="trackWidth">
+        <div class="day-head"
+             *ngFor="let d of days; trackBy: trackByDay"
+             [class.weekend]="d.weekend"
+             [class.today]="d.isToday"
+             [class.narrow]="dayWidth < 34"
+             [style.width.px]="dayWidth">
+          <span class="month" *ngIf="d.firstOfMonth">{{ d.monthShort }}</span>
+          <span class="dow" *ngIf="dayWidth >= 34">{{ d.weekdayShort }}</span>
+          <span class="dom">{{ d.dayOfMonth }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- one row per room -->
+    <div class="gantt-row" *ngFor="let row of rows; trackBy: trackByRoom">
+      <div class="gantt-label">
+        <span class="room-number">#{{ row.room.roomNumber }}</span>
+        <span class="room-meta">{{ row.room.type }} &middot; {{ row.room.capacity }} pax</span>
+        <span class="room-maintenance" *ngIf="row.room.status === 'MAINTENANCE'">maintenance</span>
+        <span class="room-occupancy" *ngIf="row.room.status !== 'MAINTENANCE'">
+          {{ occupancyPercent(row) }}% booked
+        </span>
+      </div>
+
+      <div class="gantt-track" [style.width.px]="trackWidth"
+           [class.row-maintenance]="row.room.status === 'MAINTENANCE'">
+        <div class="day-cell"
+             *ngFor="let d of days; trackBy: trackByDay"
+             [class.weekend]="d.weekend"
+             [class.today]="d.isToday"
+             [style.width.px]="dayWidth"></div>
+
+        <div class="bar"
+             *ngFor="let bar of row.bars; trackBy: trackByBar"
+             [ngClass]="'bar-' + bar.status"
+             [class.clipped-start]="bar.clippedStart"
+             [class.clipped-end]="bar.clippedEnd"
+             [style.left.px]="bar.left"
+             [style.width.px]="bar.width"
+             [matTooltip]="bar.tooltip"
+             matTooltipClass="timeline-tooltip"
+             role="button"
+             tabindex="0"
+             (click)="selectReservation(bar)"
+             (keydown.enter)="selectReservation(bar)"
+             (keydown.space)="selectReservation(bar)">
+          <span class="bar-label">{{ bar.label }}</span>
+        </div>
+      </div>
+    </div>
+
+    <p class="empty" *ngIf="!loading && !rows.length">
+      No rooms to show yet. Add a room first and its availability will appear here.
+    </p>
+  </div>
+
+  <div class="legend" *ngIf="!error">
+    <span class="legend-item"><i class="swatch bar-CONFIRMED"></i> Confirmed</span>
+    <span class="legend-item"><i class="swatch bar-CHECKED_IN"></i> Checked in</span>
+    <span class="legend-item"><i class="swatch bar-CHECKED_OUT"></i> Checked out</span>
+    <span class="legend-item"><i class="swatch bar-PENDING"></i> Pending</span>
+    <span class="legend-hint">
+      <mat-icon inline>pan_tool</mat-icon>
+      Drag sideways to travel through time &middot; click a bar to manage it
+    </span>
+  </div>
+
+</mat-card>
