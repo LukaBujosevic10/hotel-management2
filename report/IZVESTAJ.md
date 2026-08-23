@@ -12,7 +12,7 @@ message broker, tracing).
 
 ## Arhitektura
 
-Frontend ide isključivo preko API Gateway-a. Gateway proverava JWT i rutira ka servisu
+Frontend komunicira isključivo preko API Gateway-a. Gateway proverava JWT i rutira ka servisu
 preko Eureka + LoadBalancer (`lb://`). Servisi se pozivaju sinhrono preko Feign-a
 (reservation → guest, reservation → room) ili asinhrono preko RabbitMQ (reservation →
 payment). Svi se registruju u Eureka-i, deo konfiguracije uzimaju sa Config Servera, a

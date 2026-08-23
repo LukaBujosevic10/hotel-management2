@@ -135,13 +135,10 @@ Svaki backend servis ima svoj `Dockerfile` i `pom.xml`, buildaju se nezavisno.
 
 ## Sobe — status vs zauzetost
 
-Ovo mi je najviše pravilo problema na početku. Prvobitno je `Room` imao status
-`OCCUPIED`, ali to ne može da radi kad ista soba ima više rezervacija u budućnosti za
-različite datume — status na sobi je jedan, a rezervacija ih ima puno. Zato sad `RoomStatus`
-ima samo `AVAILABLE` i `MAINTENANCE`, i to znači isključivo da li je soba uopšte u funkciji.
-Da li je slobodna za neki konkretan period — to zna samo `reservation-service`, jer jedino
-on vidi rezervacije:
+Dostupnost određene sobe za rezervaciju determiniše se na osnovu dva faktora: 
 
+1. Status sobe - manadžer određuje da li je soba trenutno dostupna (`AVAILABLE`) ili su trenutno u toj sobi neki radovi (`MAINTENANCE`)
+2. Zauzetost sobe - određena je datumom željene rezervacije, proverava se da li postoji bilo kakva vrsta preklapanaj sa nekom od već postojećih rezervacija.
 ```
 GET /api/reservations/availability?checkIn=2026-08-01&checkOut=2026-08-05&numberOfGuests=2
 GET /api/reservations/timeline?from=2026-08-01&to=2026-08-15   # za gantogram
