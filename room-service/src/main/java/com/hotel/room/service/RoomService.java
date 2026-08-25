@@ -39,7 +39,7 @@ public class RoomService {
                     "Room number " + req.getRoomNumber() + " is already taken by another room.");
         }
         Room r = new Room();
-        apply(r, req);
+        copyFields(r, req);
         r.setStatus(RoomStatus.AVAILABLE);
         return repository.save(r);
     }
@@ -51,7 +51,7 @@ public class RoomService {
             throw new DuplicateResourceException(
                     "Room number " + req.getRoomNumber() + " is already taken by another room.");
         }
-        apply(r, req);
+        copyFields(r, req);
         return repository.save(r);
     }
 
@@ -69,7 +69,7 @@ public class RoomService {
         repository.deleteById(id);
     }
 
-    private void apply(Room r, RoomRequest req) {
+    private void copyFields(Room r, RoomRequest req) {
         r.setRoomNumber(req.getRoomNumber());
         r.setType(req.getType());
         r.setFloor(req.getFloor());

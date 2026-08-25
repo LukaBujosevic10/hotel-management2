@@ -114,4 +114,6 @@ resilience4j:
         ignore-exceptions:
           - feign.FeignException$NotFound
           - feign.FeignException$BadRequest
-
+logging:
+  file:
+    name: logs/application.log

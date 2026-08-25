@@ -23,165 +23,98 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-/**
- * Centralised error handling.
- *
- * Every response carries a message a human can act on. Instead of the useless
- * "Validation failed", the caller gets exactly which field is wrong and why,
- * e.g. "Check-out date must be after the check-in date."
- */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
-    // ---------------------------------------------------------------- 404 / 409
-
-    @ExceptionHandler(ResourceNotFoundException.class)
-    public ResponseEntity<ApiError> handleNotFound(ResourceNotFoundException ex, HttpServletRequest req) {
-        return build(HttpStatus.NOT_FOUND, ex.getMessage(), req, null);
+    @ExceptionHandler({ResourceNotFoundException.class})
+    public ResponseEntity<ApiError> notFound(ResourceNotFoundException ex, HttpServletRequest req) {
+        return respond(HttpStatus.NOT_FOUND, ex.getMessage(), req, null);
     }
 
     @ExceptionHandler(DuplicateResourceException.class)
-    public ResponseEntity<ApiError> handleDuplicate(DuplicateResourceException ex, HttpServletRequest req) {
-        return build(HttpStatus.CONFLICT, ex.getMessage(), req, null);
+    public ResponseEntity<ApiError> duplicate(DuplicateResourceException ex, HttpServletRequest req) {
+        return respond(HttpStatus.CONFLICT, ex.getMessage(), req, null);
+    }
+
+    @ExceptionHandler(BadRequestException.class)
+    public ResponseEntity<ApiError> badRequest(BadRequestException ex, HttpServletRequest req) {
+        // koristi se npr. kad se pokusa naplatiti vec naplaceno placanje
+        return respond(HttpStatus.BAD_REQUEST, ex.getMessage(), req, null);
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)
-    public ResponseEntity<ApiError> handleIntegrity(DataIntegrityViolationException ex, HttpServletRequest req) {
+    public ResponseEntity<ApiError> integrityViolation(DataIntegrityViolationException ex, HttpServletRequest req) {
         log.warn("Data integrity violation on {}: {}", req.getRequestURI(), ex.getMostSpecificCause().getMessage());
-        return build(HttpStatus.CONFLICT,
-                "This operation conflicts with data that already exists. "
-                        + "Most likely a value that must be unique is already used.", req, null);
+        return respond(HttpStatus.CONFLICT, "Duplikat placanja za istu rezervaciju.", req, null);
     }
 
-    // ------------------------------------------------------------ 400 (bean validation)
-
-    @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ApiError> handleValidation(MethodArgumentNotValidException ex, HttpServletRequest req) {
+    @ExceptionHandler({MethodArgumentNotValidException.class})
+    public ResponseEntity<ApiError> beanValidation(MethodArgumentNotValidException ex, HttpServletRequest req) {
         Map<String, String> fieldErrors = new LinkedHashMap<>();
-        for (FieldError fe : ex.getBindingResult().getFieldErrors()) {
-            fieldErrors.putIfAbsent(fe.getField(), fe.getDefaultMessage());
-        }
-        // Human readable summary: "Check-in date is required. Number of guests must be at least 1."
-        String message = fieldErrors.entrySet().stream()
-                .map(e -> sentence(humanize(e.getKey()) + " " + lowerFirst(e.getValue())))
-                .collect(Collectors.joining(" "));
-        if (message.isBlank()) {
-            message = "The submitted data is not valid.";
-        }
-        return build(HttpStatus.BAD_REQUEST, message, req, fieldErrors);
+        ex.getBindingResult().getFieldErrors().forEach(fe -> fieldErrors.putIfAbsent(fe.getField(), fe.getDefaultMessage()));
+        return respond(HttpStatus.BAD_REQUEST, summarize(fieldErrors), req, fieldErrors);
     }
 
     @ExceptionHandler(ConstraintViolationException.class)
-    public ResponseEntity<ApiError> handleConstraint(ConstraintViolationException ex, HttpServletRequest req) {
+    public ResponseEntity<ApiError> pathValidation(ConstraintViolationException ex, HttpServletRequest req) {
         Map<String, String> fieldErrors = new LinkedHashMap<>();
         for (ConstraintViolation<?> cv : ex.getConstraintViolations()) {
             String path = cv.getPropertyPath().toString();
-            String field = path.contains(".") ? path.substring(path.lastIndexOf('.') + 1) : path;
-            fieldErrors.putIfAbsent(field, cv.getMessage());
+            fieldErrors.putIfAbsent(path.contains(".") ? path.substring(path.lastIndexOf('.') + 1) : path, cv.getMessage());
         }
-        String message = fieldErrors.entrySet().stream()
-                .map(e -> sentence(humanize(e.getKey()) + " " + lowerFirst(e.getValue())))
-                .collect(Collectors.joining(" "));
-        return build(HttpStatus.BAD_REQUEST, message, req, fieldErrors);
+        return respond(HttpStatus.BAD_REQUEST, summarize(fieldErrors), req, fieldErrors);
     }
 
-    // ------------------------------------------------------------ 400 (bad input shape)
-
     @ExceptionHandler(MissingServletRequestParameterException.class)
-    public ResponseEntity<ApiError> handleMissingParam(MissingServletRequestParameterException ex,
-                                                       HttpServletRequest req) {
-        return build(HttpStatus.BAD_REQUEST,
-                "Required parameter '" + ex.getParameterName() + "' is missing.", req,
-                Map.of(ex.getParameterName(), "is required"));
+    public ResponseEntity<ApiError> missingParam(MissingServletRequestParameterException ex, HttpServletRequest req) {
+        return respond(HttpStatus.BAD_REQUEST, "Nedostaje parametar '" + ex.getParameterName() + "'.",
+                req, Map.of(ex.getParameterName(), "is required"));
     }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
-    public ResponseEntity<ApiError> handleTypeMismatch(MethodArgumentTypeMismatchException ex,
-                                                       HttpServletRequest req) {
-        String name = ex.getName();
-        Object value = ex.getValue();
+    public ResponseEntity<ApiError> typeMismatch(MethodArgumentTypeMismatchException ex, HttpServletRequest req) {
         Class<?> target = ex.getRequiredType();
-        String message;
-        if (target != null && target.isEnum()) {
-            message = "'" + value + "' is not a valid value for '" + name + "'. Allowed values: "
-                    + allowedValues(target) + ".";
-        } else if (target != null && target.getSimpleName().equals("LocalDate")) {
-            message = "'" + value + "' is not a valid date for '" + name + "'. Expected format is yyyy-MM-dd.";
-        } else {
-            message = "'" + value + "' is not a valid value for '" + name + "'.";
-        }
-        return build(HttpStatus.BAD_REQUEST, message, req, Map.of(name, "has an invalid value"));
+        String msg = (target != null && target.isEnum())
+                ? "'" + ex.getValue() + "' nije dozvoljena vrednost za '" + ex.getName() + "'. Moze biti: " + enumValues(target) + "."
+                : "'" + ex.getValue() + "' nije validna vrednost za '" + ex.getName() + "'.";
+        return respond(HttpStatus.BAD_REQUEST, msg, req, Map.of(ex.getName(), "has an invalid value"));
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
-    public ResponseEntity<ApiError> handleUnreadable(HttpMessageNotReadableException ex, HttpServletRequest req) {
-        Throwable cause = ex.getCause();
-        if (cause instanceof InvalidFormatException ife) {
-            String field = ife.getPath().isEmpty() ? "value"
-                    : ife.getPath().get(ife.getPath().size() - 1).getFieldName();
+    public ResponseEntity<ApiError> unreadableBody(HttpMessageNotReadableException ex, HttpServletRequest req) {
+        if (ex.getCause() instanceof InvalidFormatException ife) {
+            String field = ife.getPath().isEmpty() ? "value" : ife.getPath().get(ife.getPath().size() - 1).getFieldName();
             Class<?> target = ife.getTargetType();
-            String message;
-            if (target != null && target.isEnum()) {
-                message = "'" + ife.getValue() + "' is not a valid value for " + humanize(field).toLowerCase()
-                        + ". Allowed values: " + allowedValues(target) + ".";
-            } else if (target != null && target.getSimpleName().equals("LocalDate")) {
-                message = "'" + ife.getValue() + "' is not a valid date for " + humanize(field).toLowerCase()
-                        + ". Expected format is yyyy-MM-dd.";
-            } else {
-                message = "'" + ife.getValue() + "' is not a valid value for " + humanize(field).toLowerCase() + ".";
-            }
-            return build(HttpStatus.BAD_REQUEST, message, req, Map.of(field, "has an invalid value"));
+            String msg = (target != null && target.isEnum())
+                    ? "'" + ife.getValue() + "' nije dozvoljena vrednost za " + field + ". Moze biti: " + enumValues(target) + "."
+                    : "'" + ife.getValue() + "' nije validna vrednost za " + field + ".";
+            return respond(HttpStatus.BAD_REQUEST, msg, req, Map.of(field, "has an invalid value"));
         }
-        return build(HttpStatus.BAD_REQUEST,
-                "The request body could not be read. Please check that it is valid JSON.", req, null);
+        return respond(HttpStatus.BAD_REQUEST, "Telo zahteva nije validan JSON.", req, null);
     }
-
-    // ---------------------------------------------------------------- domain
-
-    @ExceptionHandler(BadRequestException.class)
-    public ResponseEntity<ApiError> handleBadRequest(BadRequestException ex, HttpServletRequest req) {
-        return build(HttpStatus.BAD_REQUEST, ex.getMessage(), req, null);
-    }
-
-    // ---------------------------------------------------------------- fallback
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ApiError> handleGeneric(Exception ex, HttpServletRequest req) {
+    public ResponseEntity<ApiError> fallback(Exception ex, HttpServletRequest req) {
         log.error("Unhandled error on {} {}", req.getMethod(), req.getRequestURI(), ex);
-        return build(HttpStatus.INTERNAL_SERVER_ERROR,
-                "Unexpected server error: " + ex.getMessage(), req, null);
+        return respond(HttpStatus.INTERNAL_SERVER_ERROR, "Unexpected server error: " + ex.getMessage(), req, null);
     }
 
-    // ---------------------------------------------------------------- helpers
-
-    private ResponseEntity<ApiError> build(HttpStatus status, String message,
-                                           HttpServletRequest req, Map<String, String> fieldErrors) {
-        ApiError body = new ApiError(LocalDateTime.now(), status.value(),
-                status.getReasonPhrase(), message, req.getRequestURI(), fieldErrors);
-        return ResponseEntity.status(status).body(body);
+    private ResponseEntity<ApiError> respond(HttpStatus status, String message, HttpServletRequest req, Map<String, String> fieldErrors) {
+        return ResponseEntity.status(status)
+                .body(new ApiError(LocalDateTime.now(), status.value(), status.getReasonPhrase(), message, req.getRequestURI(), fieldErrors));
     }
 
-    private static String allowedValues(Class<?> enumType) {
+    private static String summarize(Map<String, String> fieldErrors) {
+        if (fieldErrors.isEmpty()) return "The submitted data is not valid.";
+        return fieldErrors.entrySet().stream()
+                .map(e -> e.getKey() + ": " + e.getValue())
+                .collect(Collectors.joining("; "));
+    }
+
+    private static String enumValues(Class<?> enumType) {
         Object[] constants = enumType.getEnumConstants();
-        return constants == null ? "" : Arrays.stream(constants).map(Object::toString)
-                .collect(Collectors.joining(", "));
-    }
-
-    /** checkInDate -> "Check in date" */
-    private static String humanize(String field) {
-        String spaced = field.replaceAll("([a-z0-9])([A-Z])", "$1 $2").toLowerCase();
-        return spaced.isEmpty() ? spaced : Character.toUpperCase(spaced.charAt(0)) + spaced.substring(1);
-    }
-
-    private static String lowerFirst(String text) {
-        if (text == null || text.isEmpty()) return "is not valid";
-        return Character.toLowerCase(text.charAt(0)) + text.substring(1);
-    }
-
-    private static String sentence(String text) {
-        String trimmed = text.trim();
-        return trimmed.endsWith(".") || trimmed.endsWith("!") || trimmed.endsWith("?") ? trimmed : trimmed + ".";
+        return constants == null ? "" : Arrays.stream(constants).map(Object::toString).collect(Collectors.joining(", "));
     }
 }

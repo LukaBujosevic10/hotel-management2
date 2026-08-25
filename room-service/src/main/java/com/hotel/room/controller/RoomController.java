@@ -3,7 +3,6 @@ package com.hotel.room.controller;
 import com.hotel.room.dto.RoomRequest;
 import com.hotel.room.dto.RoomResponse;
 import com.hotel.room.entity.RoomStatus;
-import com.hotel.room.service.RoomService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;

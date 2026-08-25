@@ -109,7 +109,7 @@
 
 .gantt-track.row-maintenance {
   background-image: repeating-linear-gradient(
-    45deg, transparent, transparent 6px, #fbe9e7 6px, #fbe9e7 12px
+          45deg, transparent, transparent 6px, #fbe9e7 6px, #fbe9e7 12px
   );
 }
 
@@ -201,11 +201,11 @@
 .clipped-end { border-top-right-radius: 0; border-bottom-right-radius: 0; }
 
 /* status colours, shared with the legend swatches */
-.bar-CONFIRMED  { background: #d7e3fb; color: #1a3d7c; border-left: 3px solid #3f51b5; }
-.bar-CHECKED_IN { background: #d6f0dd; color: #14532d; border-left: 3px solid #2e7d32; }
-.bar-CHECKED_OUT{ background: #e5e7eb; color: #4b5563; border-left: 3px solid #9ca3af; }
-.bar-PENDING    { background: #fdeccd; color: #7c4a03; border-left: 3px solid #ef8f00; }
-.bar-CANCELLED  { background: #f5f5f5; color: #9e9e9e; border-left: 3px dashed #bdbdbd; }
+.bar-CONFIRMED  { background: #9acd32; color: #2e4d00; border-left: 3px solid #0055ff; }
+.bar-CHECKED_IN { background: #1e90ff; color: #ffffff; border-left: 3px solid #0055ff; }
+.bar-CHECKED_OUT{ background: #d3a4ff; color: #330066; border-left: 3px solid #0055ff; }
+.bar-PENDING    { background: #ffcc00; color: #4d3d00; border-left: 3px solid #0055ff; }
+.bar-CANCELLED  { background: #f5f5f5; color: #757575; border-left: 3px dashed #0055ff; }
 
 .empty {
   padding: 24px 16px;

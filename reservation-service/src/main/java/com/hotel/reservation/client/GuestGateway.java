@@ -13,10 +13,7 @@ import org.springframework.stereotype.Component;
 import java.util.Collections;
 import java.util.List;
 
-/**
- * Resilience4j guarded facade over {@link GuestClient}. See {@link RoomGateway}
- * for why this is a separate bean.
- */
+
 @Component
 public class GuestGateway {
 
@@ -49,16 +46,13 @@ public class GuestGateway {
         return client.getAllGuests();
     }
 
-    /**
-     * Guest names are only cosmetic on the timeline, so here a degraded answer
-     * is better than an error: the timeline still renders, just without names.
-     */
+
     public List<GuestDto> getAllFallback(Throwable t) {
         log.warn("guest-service unreachable while listing guests: {}", t.toString());
         return Collections.emptyList();
     }
 
-    /** Same as {@link #getById} but returns null instead of failing (read-only screens). */
+
     @CircuitBreaker(name = "guestService", fallbackMethod = "optionalFallback")
     @Retry(name = "guestService")
     public GuestDto getByIdOrNull(Long guestId) {

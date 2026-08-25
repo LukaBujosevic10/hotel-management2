@@ -23,39 +23,10 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-/**
- * Centralised error handling.
- *
- * Every response carries a message a human can act on. Instead of the useless
- * "Validation failed", the caller gets exactly which field is wrong and why,
- * e.g. "Check-out date must be after the check-in date."
- */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
-
-    // ---------------------------------------------------------------- 404 / 409
-
-    @ExceptionHandler(ResourceNotFoundException.class)
-    public ResponseEntity<ApiError> handleNotFound(ResourceNotFoundException ex, HttpServletRequest req) {
-        return build(HttpStatus.NOT_FOUND, ex.getMessage(), req, null);
-    }
-
-    @ExceptionHandler(DuplicateResourceException.class)
-    public ResponseEntity<ApiError> handleDuplicate(DuplicateResourceException ex, HttpServletRequest req) {
-        return build(HttpStatus.CONFLICT, ex.getMessage(), req, null);
-    }
-
-    @ExceptionHandler(DataIntegrityViolationException.class)
-    public ResponseEntity<ApiError> handleIntegrity(DataIntegrityViolationException ex, HttpServletRequest req) {
-        log.warn("Data integrity violation on {}: {}", req.getRequestURI(), ex.getMostSpecificCause().getMessage());
-        return build(HttpStatus.CONFLICT,
-                "This operation conflicts with data that already exists. "
-                        + "Most likely a value that must be unique is already used.", req, null);
-    }
-
-    // ------------------------------------------------------------ 400 (bean validation)
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiError> handleValidation(MethodArgumentNotValidException ex, HttpServletRequest req) {
@@ -63,14 +34,11 @@ public class GlobalExceptionHandler {
         for (FieldError fe : ex.getBindingResult().getFieldErrors()) {
             fieldErrors.putIfAbsent(fe.getField(), fe.getDefaultMessage());
         }
-        // Human readable summary: "Check-in date is required. Number of guests must be at least 1."
         String message = fieldErrors.entrySet().stream()
-                .map(e -> sentence(humanize(e.getKey()) + " " + lowerFirst(e.getValue())))
+                .map(e -> sentence(prettifyField(e.getKey()) + " " + lowerFirst(e.getValue())))
                 .collect(Collectors.joining(" "));
-        if (message.isBlank()) {
-            message = "The submitted data is not valid.";
-        }
-        return build(HttpStatus.BAD_REQUEST, message, req, fieldErrors);
+        return build(HttpStatus.BAD_REQUEST, message.isBlank() ? "The submitted data is not valid." : message,
+                req, fieldErrors);
     }
 
     @ExceptionHandler(ConstraintViolationException.class)
@@ -82,12 +50,10 @@ public class GlobalExceptionHandler {
             fieldErrors.putIfAbsent(field, cv.getMessage());
         }
         String message = fieldErrors.entrySet().stream()
-                .map(e -> sentence(humanize(e.getKey()) + " " + lowerFirst(e.getValue())))
+                .map(e -> sentence(prettifyField(e.getKey()) + " " + lowerFirst(e.getValue())))
                 .collect(Collectors.joining(" "));
         return build(HttpStatus.BAD_REQUEST, message, req, fieldErrors);
     }
-
-    // ------------------------------------------------------------ 400 (bad input shape)
 
     @ExceptionHandler(MissingServletRequestParameterException.class)
     public ResponseEntity<ApiError> handleMissingParam(MissingServletRequestParameterException ex,
@@ -124,13 +90,10 @@ public class GlobalExceptionHandler {
             Class<?> target = ife.getTargetType();
             String message;
             if (target != null && target.isEnum()) {
-                message = "'" + ife.getValue() + "' is not a valid value for " + humanize(field).toLowerCase()
+                message = "'" + ife.getValue() + "' is not a valid value for " + prettifyField(field).toLowerCase()
                         + ". Allowed values: " + allowedValues(target) + ".";
-            } else if (target != null && target.getSimpleName().equals("LocalDate")) {
-                message = "'" + ife.getValue() + "' is not a valid date for " + humanize(field).toLowerCase()
-                        + ". Expected format is yyyy-MM-dd.";
             } else {
-                message = "'" + ife.getValue() + "' is not a valid value for " + humanize(field).toLowerCase() + ".";
+                message = "'" + ife.getValue() + "' is not a valid value for " + prettifyField(field).toLowerCase() + ".";
             }
             return build(HttpStatus.BAD_REQUEST, message, req, Map.of(field, "has an invalid value"));
         }
@@ -138,22 +101,34 @@ public class GlobalExceptionHandler {
                 "The request body could not be read. Please check that it is valid JSON.", req, null);
     }
 
-    // ---------------------------------------------------------------- fallback
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity<ApiError> handleNotFound(ResourceNotFoundException ex, HttpServletRequest req) {
+        return build(HttpStatus.NOT_FOUND, ex.getMessage(), req, null);
+    }
+
+    @ExceptionHandler(DuplicateResourceException.class)
+    public ResponseEntity<ApiError> handleDuplicate(DuplicateResourceException ex, HttpServletRequest req) {
+        return build(HttpStatus.CONFLICT, ex.getMessage(), req, null);
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ApiError> handleIntegrity(DataIntegrityViolationException ex, HttpServletRequest req) {
+        log.warn("Data integrity violation on {}: {}", req.getRequestURI(), ex.getMostSpecificCause().getMessage());
+        return build(HttpStatus.CONFLICT,
+                "This operation conflicts with data that already exists (probably a duplicate room number).",
+                req, null);
+    }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiError> handleGeneric(Exception ex, HttpServletRequest req) {
         log.error("Unhandled error on {} {}", req.getMethod(), req.getRequestURI(), ex);
-        return build(HttpStatus.INTERNAL_SERVER_ERROR,
-                "Unexpected server error: " + ex.getMessage(), req, null);
+        return build(HttpStatus.INTERNAL_SERVER_ERROR, "Unexpected server error: " + ex.getMessage(), req, null);
     }
-
-    // ---------------------------------------------------------------- helpers
 
     private ResponseEntity<ApiError> build(HttpStatus status, String message,
                                            HttpServletRequest req, Map<String, String> fieldErrors) {
-        ApiError body = new ApiError(LocalDateTime.now(), status.value(),
-                status.getReasonPhrase(), message, req.getRequestURI(), fieldErrors);
-        return ResponseEntity.status(status).body(body);
+        return ResponseEntity.status(status).body(new ApiError(LocalDateTime.now(), status.value(),
+                status.getReasonPhrase(), message, req.getRequestURI(), fieldErrors));
     }
 
     private static String allowedValues(Class<?> enumType) {
@@ -162,8 +137,8 @@ public class GlobalExceptionHandler {
                 .collect(Collectors.joining(", "));
     }
 
-    /** checkInDate -> "Check in date" */
-    private static String humanize(String field) {
+    // roomNumber -> "Room number"
+    private static String prettifyField(String field) {
         String spaced = field.replaceAll("([a-z0-9])([A-Z])", "$1 $2").toLowerCase();
         return spaced.isEmpty() ? spaced : Character.toUpperCase(spaced.charAt(0)) + spaced.substring(1);
     }
@@ -174,7 +149,7 @@ public class GlobalExceptionHandler {
     }
 
     private static String sentence(String text) {
-        String trimmed = text.trim();
-        return trimmed.endsWith(".") || trimmed.endsWith("!") || trimmed.endsWith("?") ? trimmed : trimmed + ".";
+        String t = text.trim();
+        return t.endsWith(".") || t.endsWith("!") || t.endsWith("?") ? t : t + ".";
     }
 }

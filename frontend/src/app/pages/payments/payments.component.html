@@ -35,10 +35,6 @@
       </button>
 
       <span class="spacer"></span>
-      <span class="outstanding" *ngIf="outstandingTotal > 0"
-            matTooltip="Sum of the pending payments currently listed">
-        &euro;{{ outstandingTotal | number:'1.2-2' }} outstanding
-      </span>
       <span class="count">{{ visibleCount }} of {{ totalCount }}</span>
     </div>
   </mat-card>
