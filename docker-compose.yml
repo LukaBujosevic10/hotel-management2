@@ -11,12 +11,11 @@ services:
     environment:
       - POSTGRES_USER=hotel
       - POSTGRES_PASSWORD=hotel
-      - POSTGRES_DB=postgres          # default db; extra dbs created by init.sql
+      - POSTGRES_DB=postgres
     ports:
       - "5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
-      # init.sql runs only on FIRST start (empty volume) -> creates the 4 databases
       - ./db-init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U hotel -d postgres"]
@@ -30,8 +29,8 @@ services:
     image: rabbitmq:3.13-management
     container_name: rabbitmq
     ports:
-      - "5672:5672"       # AMQP
-      - "15672:15672"     # Management UI (guest/guest)
+      - "5672:5672"
+      - "15672:15672"
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 15s
@@ -68,6 +67,11 @@ services:
       - CONFIG_REPO_LOCATION=file:/config-repo
     volumes:
       - ./config-repo:/config-repo:ro
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8888/application/default"]
+      interval: 15s
+      timeout: 10s
+      retries: 15
     depends_on:
       eureka-server:
         condition: service_healthy
@@ -89,8 +93,12 @@ services:
     depends_on:
       eureka-server:
         condition: service_healthy
+      config-server:
+        condition: service_healthy
       postgres:
         condition: service_healthy
+      zipkin:
+        condition: service_started
     networks: [hotel-net]
 
   room-service:
@@ -108,8 +116,12 @@ services:
     depends_on:
       eureka-server:
         condition: service_healthy
+      config-server:
+        condition: service_healthy
       postgres:
         condition: service_healthy
+      zipkin:
+        condition: service_started
     networks: [hotel-net]
 
   reservation-service:
@@ -128,10 +140,14 @@ services:
     depends_on:
       eureka-server:
         condition: service_healthy
+      config-server:
+        condition: service_healthy
       rabbitmq:
         condition: service_healthy
       postgres:
         condition: service_healthy
+      zipkin:
+        condition: service_started
     networks: [hotel-net]
 
   payment-service:
@@ -150,10 +166,14 @@ services:
     depends_on:
       eureka-server:
         condition: service_healthy
+      config-server:
+        condition: service_healthy
       rabbitmq:
         condition: service_healthy
       postgres:
         condition: service_healthy
+      zipkin:
+        condition: service_started
     networks: [hotel-net]
 
   api-gateway:
@@ -170,6 +190,10 @@ services:
     depends_on:
       eureka-server:
         condition: service_healthy
+      config-server:
+        condition: service_healthy
+      zipkin:
+        condition: service_started
     networks: [hotel-net]
 
   auth-service:
@@ -185,26 +209,28 @@ services:
       - ZIPKIN_URL=http://zipkin:9411/api/v2/spans
       - JWT_SECRET=change-me-super-secret-hotel-jwt-signing-key-256bits!!
     depends_on:
-      - eureka-server
-      - config-server
+      eureka-server:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      zipkin:
+        condition: service_started
     networks: [hotel-net]
 
   frontend:
     build: ./frontend
     container_name: hotel-frontend
     restart: on-failure
-    # Angular dev server podrazumevano radi na 4200 unutar kontejnera
     ports:
       - "4200:4200"
     volumes:
-      # Mapira tvoj lokalni kod u /app unutar kontejnera (omogućava live reload)
       - ./frontend:/app
-      # Štiti kontejnerski node_modules da ga ne pregazi tvoj lokalni (Windows/Mac)
       - /app/node_modules
     environment:
       - CHOKIDAR_USEPOLLING=true
     depends_on:
-      - api-gateway
+      api-gateway:
+        condition: service_started
     networks: [ hotel-net ]
 
 volumes:
