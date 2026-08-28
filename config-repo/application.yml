@@ -31,3 +31,5 @@ hotel:
 security:
   jwt:
     secret: ${JWT_SECRET:change-me-super-secret-hotel-jwt-signing-key-256bits!!}
+server:
+  forward-headers-strategy: framework
